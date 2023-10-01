@@ -10,6 +10,7 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -29,6 +30,7 @@ public class BeerServiceJPA implements BeerService {
 
     private static final int DEFAULT_PAGE = 0;
     private static final int DEFAULT_PAGE_SIZE = 25;
+    private static final int MAX_PAGE_SIZE = 1000;
 
     @Override
     public Page<BeerDTO> listBeers(String beerName, BeerStyle beerStyle, Boolean showInventory,
@@ -37,8 +39,7 @@ public class BeerServiceJPA implements BeerService {
         PageRequest pageRequest = buildPageRequest(pageNumber, pageSize);
 
         Page<Beer> beerPage;
-
-        if(StringUtils.hasText(beerName) && beerStyle == null) {
+        if (StringUtils.hasText(beerName) && beerStyle == null) {
             beerPage = listBeersByName(beerName, pageRequest);
         } else if (!StringUtils.hasText(beerName) && beerStyle != null){
             beerPage = listBeersByStyle(beerStyle, pageRequest);
@@ -57,26 +58,19 @@ public class BeerServiceJPA implements BeerService {
     }
 
     public PageRequest buildPageRequest(Integer pageNumber, Integer pageSize) {
-        int queryPageNumber;
-        int queryPageSize;
+        int queryPageNumber =
+                Optional.ofNullable(pageNumber).filter(n -> n > 0).isPresent()
+                ? pageNumber - 1
+                : DEFAULT_PAGE;
 
-        if (pageNumber != null && pageNumber > 0) {
-            queryPageNumber = pageNumber - 1;
-        } else {
-            queryPageNumber = DEFAULT_PAGE;
-        }
+        int queryPageSize =
+                pageSize != null
+                ? Math.min(pageSize, MAX_PAGE_SIZE)
+                : DEFAULT_PAGE_SIZE;
 
-        if (pageSize == null) {
-            queryPageSize = DEFAULT_PAGE_SIZE;
-        } else {
-            if (pageSize > 1000) {
-                queryPageSize = 1000;
-            } else {
-                queryPageSize = pageSize;
-            }
-        }
+        Sort sort = Sort.by(Sort.Order.asc("beerName"));
 
-        return PageRequest.of(queryPageNumber, queryPageSize);
+        return PageRequest.of(queryPageNumber, queryPageSize, sort);
     }
 
     private Page<Beer> listBeersByNameAndStyle(String beerName, BeerStyle beerStyle, Pageable pageable) {
